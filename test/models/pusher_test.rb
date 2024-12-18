@@ -44,10 +44,10 @@ class PusherTest < ActiveSupport::TestCase
       should "work normally when things go well" do
         @cutter.stubs(:pull_spec).returns true
         @cutter.stubs(:find).returns true
-        @cutter.stubs(:validate_dependencies_exist).returns true
         @cutter.stubs(:authorize).returns true
         @cutter.stubs(:verify_mfa_requirement).returns true
         @cutter.stubs(:verify_gem_scope).returns true
+        @cutter.stubs(:verify_dependencies_resolvable).returns true
         @cutter.stubs(:validate).returns true
         @cutter.stubs(:verify_sigstore).returns true
         @cutter.stubs(:sign_sigstore).returns true
@@ -59,7 +59,6 @@ class PusherTest < ActiveSupport::TestCase
       should "not attempt to find rubygem if spec can't be pulled" do
         @cutter.stubs(:pull_spec).returns false
         @cutter.stubs(:find).never
-        @cutter.stubs(:validate_dependencies_exist).never
         @cutter.stubs(:authorize).never
         @cutter.stubs(:verify_gem_scope).never
         @cutter.stubs(:verify_mfa_requirement).never
@@ -70,7 +69,6 @@ class PusherTest < ActiveSupport::TestCase
       should "not attempt to validate dependency resolution if not found" do
         @cutter.stubs(:pull_spec).returns true
         @cutter.stubs(:find)
-        @cutter.stubs(:validate_dependencies_exist).never
         @cutter.stubs(:authorize).never
         @cutter.stubs(:verify_gem_scope).never
         @cutter.stubs(:verify_mfa_requirement).never
@@ -82,7 +80,6 @@ class PusherTest < ActiveSupport::TestCase
       should "not attempt to authorize if dependencies don't exist" do
         @cutter.stubs(:pull_spec).returns true
         @cutter.stubs(:find).returns true
-        @cutter.stubs(:validate_dependencies_exist).returns false
         @cutter.stubs(:authorize).never
         @cutter.stubs(:verify_gem_scope).never
         @cutter.stubs(:verify_mfa_requirement).never
@@ -95,7 +92,6 @@ class PusherTest < ActiveSupport::TestCase
       should "not attempt to check gem scope if not authorized" do
         @cutter.stubs(:pull_spec).returns true
         @cutter.stubs(:find).returns true
-        @cutter.stubs(:validate_dependencies_exist).returns true
         @cutter.stubs(:authorize).returns false
         @cutter.stubs(:verify_gem_scope).never
         @cutter.stubs(:verify_mfa_requirement).never
@@ -108,7 +104,6 @@ class PusherTest < ActiveSupport::TestCase
       should "not attempt to check mfa requirement if scoped to another gem" do
         @cutter.stubs(:pull_spec).returns true
         @cutter.stubs(:find).returns true
-        @cutter.stubs(:validate_dependencies_exist).returns true
         @cutter.stubs(:authorize).returns true
         @cutter.stubs(:verify_gem_scope).returns false
         @cutter.stubs(:verify_mfa_requirement).never
@@ -121,7 +116,6 @@ class PusherTest < ActiveSupport::TestCase
       should "not attempt to validate if mfa check failed" do
         @cutter.stubs(:pull_spec).returns true
         @cutter.stubs(:find).returns true
-        @cutter.stubs(:validate_dependencies_exist).returns true
         @cutter.stubs(:authorize).returns true
         @cutter.stubs(:verify_gem_scope).returns true
         @cutter.stubs(:verify_mfa_requirement).returns false
@@ -134,7 +128,6 @@ class PusherTest < ActiveSupport::TestCase
       should "not attempt to save if not validated" do
         @cutter.stubs(:pull_spec).returns true
         @cutter.stubs(:find).returns true
-        @cutter.stubs(:validate_dependencies_exist).returns true
         @cutter.stubs(:authorize).returns true
         @cutter.stubs(:verify_gem_scope).returns true
         @cutter.stubs(:verify_mfa_requirement).returns true
@@ -222,7 +215,6 @@ class PusherTest < ActiveSupport::TestCase
           .instance_variable_set(:@requirements, [["!!!", "0"]])
       end)
       @cutter.stubs(:validate_signature_exists?).returns(true)
-      @cutter.stubs(:validate_dependencies_exist).returns(true)
 
       @cutter.process
 
@@ -235,7 +227,6 @@ class PusherTest < ActiveSupport::TestCase
         s.add_runtime_dependency "\nother"
       end)
       @cutter.stubs(:validate_signature_exists?).returns(true)
-      @cutter.stubs(:validate_dependencies_exist).returns(true)
 
       @cutter.process
 
@@ -250,8 +241,8 @@ class PusherTest < ActiveSupport::TestCase
 
       @cutter.process
 
-      assert_match(/non-existent-gem could not be found/, @cutter.message)
-      assert_equal 403, @cutter.code
+      assert_match(/Cannot publish gem. The following dependencies don't exist: non-existent-gem/, @cutter.message)
+      assert_equal 422, @cutter.code # Not sure what code to use here
     end
 
     should "not be able to save a gem if the metadata has incorrect values" do
@@ -630,7 +621,7 @@ class PusherTest < ActiveSupport::TestCase
         
         @cutter.process
         
-        assert_equal "Cannot push gem. The following dependencies don't exist: non-existent-gem", @cutter.message
+        assert_equal "Cannot publish gem. The following dependencies don't exist: non-existent-gem", @cutter.message
         assert_equal 422, @cutter.code
       end
     end

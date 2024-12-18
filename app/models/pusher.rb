@@ -23,10 +23,10 @@ class Pusher
     trace("gemcutter.pusher.process", tags: { "gemcutter.api_key.owner" => owner.to_gid }) do
       pull_spec &&
         find &&
-        validate_dependencies_exist &&
         authorize &&
         verify_gem_scope &&
         verify_mfa_requirement &&
+        verify_dependencies_resolvable &&
         validate &&
         save
     end
@@ -207,7 +207,7 @@ class Pusher
     MSG
   end
 
-  def validate_dependencies_exist
+  def verify_dependencies_resolvable
     return true if spec.nil?
     
     dependency_names = spec.dependencies.map(&:name)
