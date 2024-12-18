@@ -23,6 +23,7 @@ class Pusher
     trace("gemcutter.pusher.process", tags: { "gemcutter.api_key.owner" => owner.to_gid }) do
       pull_spec &&
         find &&
+        validate_dependencies_exist &&
         authorize &&
         verify_gem_scope &&
         verify_mfa_requirement &&
@@ -204,6 +205,22 @@ class Pusher
       Error verifying sigstore attestation:
       #{e.message}
     MSG
+  end
+
+  def validate_dependencies_exist
+    return true if spec.nil?
+    
+    dependency_names = spec.dependencies.map(&:name)
+    existing_gems = Rubygem.where(name: dependency_names).pluck(:name)
+    missing_gems = dependency_names - existing_gems
+    
+    if missing_gems.any?
+      @message = "Cannot publish gem. The following dependencies don't exist: #{missing_gems.join(', ')}"
+      @code = 422
+      false
+    else
+      true
+    end
   end
 
   private
